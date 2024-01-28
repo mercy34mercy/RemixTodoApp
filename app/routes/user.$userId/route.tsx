@@ -1,10 +1,8 @@
 import { ActionFunction, json, LoaderFunction, TypedResponse } from "@remix-run/node";
-import { useLoaderData, useActionData } from "@remix-run/react";
-import { TodoRepository } from "~/routes/api/repository/todo/psql/psql.server";
-import { GetTodoByIDUsecase } from "~/routes/api/usecase/getTodoByUserID.server";
+import { useLoaderData, useActionData, Link } from "@remix-run/react";
 import type { Todo } from "~/domain/todo/todo";
-import { CreateTodoUsecase } from "../api/usecase/createTodoUsecase.server";
-import { client } from "../../_index.server";
+import { getTodoByUserIDHandler } from "../api/handler/getTodoByUserID.server";
+import { createTodoHandler } from "../api/handler/createTodHandler.server";
 
 type LoaderParams = {
     userId: string;
@@ -29,62 +27,31 @@ export const action: ActionFunction = async ({ request }): Promise<TypedResponse
         if (Object.keys(errors).length > 0) {
             return json(errors, { status: 400 });
         }
-
-        const todoRepository = new TodoRepository(client);
-        const createTodoUsecase = new CreateTodoUsecase(todoRepository);
-        const todoResponse = await createTodoUsecase.execute(
-            {
-                title: String(todoRequest.get("title")),
-                body: String(todoRequest.get("body")),
-                userId: "1"
-            },
-        );
-        const todo = {
-            title: todoResponse.title,
-            body: todoResponse.body,
-            created_at: todoResponse.createdAt,
-            completed: todoResponse.done,
-            id: todoResponse.id,
-            user_id: todoResponse.userId,
-        } as Todo
-        return json(todo);
+        const todoRespose = await createTodoHandler({
+            title: String(todoRequest.get("title")),
+            body: String(todoRequest.get("body")),
+            userId: String(todoRequest.get("userId"))
+        },)
+        return json(todoRespose);
     }
     catch (error) {
         return json(errors, { status: 500 });
     }
 }
+
 export const loader: LoaderFunction = async ({ params }) => {
     try {
         const { userId } = params as LoaderParams;
-        const todoRepository = new TodoRepository(client);
-        const todoUsecase = new GetTodoByIDUsecase(todoRepository);
-
-        const todo = await todoUsecase.execute({ userId: userId });
-
-        // createTodoRowからTodoに変換する
-        const todoList: Todo[] = [];
-        todo.forEach((element) => {
-            todoList.push({
-                id: element.id,
-                user_id: element.userId,
-                title: element.title,
-                body: element.body ?? "",
-                created_at: element.createdAt,
-                completed: element.done
-            });
-        });
-
-        return json(todoList);
+        const todoListResponse = await getTodoByUserIDHandler(userId);
+        return json(todoListResponse);
     } catch (error) {
         // エラーハンドリング。適切な HTTP ステータスコードとメッセージを設定
         return json({ message: "Error fetching todos" }, { status: 500 });
     }
 };
 
-
-
 export default function TodoByUserID(param: LoaderParams) {
-    const data = useLoaderData<typeof loader>();
+    const data = useLoaderData<typeof loader>() as Todo[];
     const actionData = useActionData<typeof action>() as Todo | CustomErr;
     return (
         <div>
@@ -108,7 +75,7 @@ export default function TodoByUserID(param: LoaderParams) {
             <ul>
                 {data.map((todo: Todo) => (
                     <li key={todo.id}>
-                        <a href={`/todo/${todo.id}`}>{todo.title}</a>
+                        <Link prefetch="intent" to={`/todo/${todo.id}`}>{todo.title}</Link>
                     </li>
                 ))}
             </ul>

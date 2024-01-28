@@ -1,7 +1,6 @@
 import pkg from 'pg';
 const {Client} = pkg;
 
-
 // ここでDBクライアントを生成する
 export const client = new Client({
     user: 'user',
@@ -11,4 +10,4 @@ export const client = new Client({
     port: 5432,
 });
 
-await client.connect();
+client.connect();
